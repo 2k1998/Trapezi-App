@@ -1,0 +1,34 @@
+# Project Context
+QR/NFC Table Ordering SaaS Platform
+- Next.js 14+ App Router
+- Tailwind CSS v3+
+- Supabase (PostgreSQL, Auth, Storage)
+
+# Database Schema & Structure
+1. `restaurants`: Master record for venues (`id`, `slug`, `plan`, `is_active`, `currency`, `languages`).
+2. `staff`: Restaurant employees (`id` matches `auth.users.id`, `restaurant_id`, `role`, `display_name`).
+3. `tables`: Physical tables with NFC/QR URLs (`id`, `restaurant_id`, `table_number`, `status`).
+4. `menu_items`: Products (`id`, `restaurant_id`, `category`, `type` -> 'food' | 'drink', `price`).
+5. `orders`: Customer tabs (`id`, `restaurant_id`, `table_id`, `order_number`, `status`, `session_id`).
+6. `order_items`: Order line items (`id`, `order_id`, `menu_item_id`, `type`, `quantity`, `unit_price`).
+
+# Roles & Routing
+Users are routed based on their `role` in the `staff` table. Ensure protective middleware guards.
+- Kitchen, Bar do not have screens (thermal print only).
+- `cashier` routes to `/[slug]/cashier` (iPad terminal handled)
+- `owner` routes to `/[slug]/dashboard` (Admin interface)
+- `admin` routes to `/admin`
+
+# UI & Tailwind Design System
+Never use hardcoded hex values. Always use our custom Tailwind color palette:
+- `brand`: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900
+- `accent`: 400 (Gold), 500 (Gold dark), 600 (Gold deeper)
+- Examples: `bg-brand-100`, `text-accent-500`
+
+Animations:
+- Utilize `framer-motion` for complex choreographed layouts.
+- Utilize `@formkit/auto-animate` for zero-config list modifications.
+- Custom tailwind classes available: `animate-fade-in`, `animate-fade-up`, `animate-scale-in`, `animate-slide-right`, `animate-shimmer`
+
+Shadow Tokens:
+- `shadow-premium`, `shadow-card`, `shadow-elevated`

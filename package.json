@@ -1,0 +1,40 @@
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "seed:users": "tsx supabase/scripts/seed_users.ts",
+    "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe"
+  },
+  "dependencies": {
+    "@formkit/auto-animate": "^0.9.0",
+    "@stripe/react-stripe-js": "^5.6.1",
+    "@stripe/stripe-js": "^8.11.0",
+    "@supabase/ssr": "^0.9.0",
+    "@supabase/supabase-js": "^2.99.3",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "framer-motion": "^12.38.0",
+    "next": "^15.2.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "resend": "^6.9.4",
+    "stripe": "^20.4.1",
+    "supabase": "^2.83.0",
+    "twilio": "^5.13.1",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
+    "autoprefixer": "^10.4.27",
+    "dotenv": "^17.3.1",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

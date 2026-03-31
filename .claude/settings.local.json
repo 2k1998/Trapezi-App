@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find . -not -path ./.next/* -not -path ./.agents/* -not -path ./node_modules/* -print)",
+      "Bash(grep -v '^$')",
+      "Bash(npm install:*)"
+    ]
+  }
+}
