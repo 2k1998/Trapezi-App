@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { stripe } from '@/lib/stripe/server'
-import { sendPaymentConfirmedSMS } from '@/lib/sms'
 import { sendPushToRestaurant } from '@/lib/push/index.server'
 
 // Must run in Node.js runtime — Edge runtime lacks crypto and Stripe needs it
@@ -106,33 +105,6 @@ export async function POST(request: NextRequest) {
       .from('tables')
       .update({ status: 'occupied' })
       .eq('id', pendingOrder.table_id)
-
-    // Get restaurant name for SMS
-    const { data: restaurant } = await supabase
-      .from('restaurants')
-      .select('name')
-      .eq('id', restaurant_id)
-      .single()
-
-    const restaurantName = (restaurant?.name as string | null) ?? ''
-
-    // --- SMS: payment confirmed ---
-    // Fire-and-forget. Never blocks the webhook response.
-    if (customer_phone) {
-      try {
-        await sendPaymentConfirmedSMS({
-          customer_phone,
-          customer_locale: null,
-          restaurant_name: restaurantName,
-        })
-        await supabase
-          .from('orders')
-          .update({ sms_payment_sent_at: new Date().toISOString() })
-          .eq('id', pending_order_id)
-      } catch (smsErr) {
-        console.error('[Webhook] SMS send failed for order', pending_order_id, smsErr)
-      }
-    }
 
     // --- Push: new order notification to cashier ---
     // Fire-and-forget. Never blocks the webhook response.

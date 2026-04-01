@@ -36,6 +36,30 @@ export async function persistPushSubscription(subscription: PushSubscription): P
   return res.ok === true
 }
 
+// Registers the service worker and creates a push subscription without
+// requesting permission — caller must ensure permission is already granted.
+export async function getOrCreatePushSubscription(): Promise<PushSubscription | null> {
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
+
+    const vapidKey = getPublicVapidKey()
+    if (!vapidKey) {
+      console.error('[Push] NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set.')
+      return null
+    }
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    })
+    return subscription
+  } catch (err) {
+    console.error('[Push] Failed to get/create subscription:', err)
+    return null
+  }
+}
+
 export async function subscribeUserToPush(): Promise<PushSubscription | null> {
   try {
     const permission = await Notification.requestPermission()

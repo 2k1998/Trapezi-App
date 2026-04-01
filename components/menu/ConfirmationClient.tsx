@@ -17,6 +17,7 @@ export type OrderPayload = {
   id: string
   order_number: number
   total: number
+  status: 'pending' | 'confirmed' | 'ready' | 'closed'
   payment_status: string
   session_id: string | null
 }
@@ -33,6 +34,8 @@ type Props = {
   currency: string
   order: OrderPayload
   items: OrderItemPayload[]
+  restaurantId: string
+  restaurantName: string
 }
 
 const CIRCLE_LEN = 2 * Math.PI * 36
@@ -49,6 +52,7 @@ export function ConfirmationClient({
   const { clearCart } = useCart(slug, tableNumber)
   const reduceMotion = useReducedMotion()
   const [showHeading, setShowHeading] = useState(false)
+  const [orderStatus, setOrderStatus] = useState<OrderPayload['status']>(order.status)
   const count = useMotionValue(0)
   const spring = useSpring(count, { stiffness: 100, damping: 20 })
 
@@ -64,6 +68,52 @@ export function ConfirmationClient({
     }, 600)
     return () => clearTimeout(t)
   }, [count, order.order_number, reduceMotion])
+
+  useEffect(() => {
+    if (orderStatus === 'ready') return
+    let cancelled = false
+    let timeoutId: number | null = null
+    let attempt = 0
+
+    const scheduleNext = () => {
+      if (cancelled) return
+      const delayMs = Math.min(1000 + attempt * 400, 4000)
+      timeoutId = window.setTimeout(() => {
+        void poll()
+      }, delayMs)
+    }
+
+    const poll = async () => {
+      if (cancelled) return
+      attempt += 1
+      try {
+        const res = await fetch(`/api/orders/${order.id}?slug=${encodeURIComponent(slug)}`, {
+          cache: 'no-store',
+        })
+        if (res.ok) {
+          const data = (await res.json()) as {
+            order?: { status?: OrderPayload['status'] }
+          }
+          const nextStatus = data.order?.status
+          if (nextStatus) {
+            setOrderStatus(nextStatus)
+            if (nextStatus === 'ready') return
+          }
+        }
+      } catch {
+        /* retry */
+      }
+      scheduleNext()
+    }
+
+    void poll()
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [order.id, orderStatus, slug])
 
   useEffect(() => {
     if (tableNumber === null) return
@@ -91,6 +141,8 @@ export function ConfirmationClient({
     }
     router.push(`/${slug}?table=${tableNumber}`)
   }
+
+  const isReady = orderStatus === 'ready'
 
   return (
     <motion.div
@@ -127,6 +179,38 @@ export function ConfirmationClient({
         {tableNumber !== null ? (
           <p className="mt-1 text-brand-500">Table {tableNumber}</p>
         ) : null}
+
+        <motion.div
+          className={`mt-4 w-full rounded-xl border px-4 py-3 text-center ${
+            isReady
+              ? 'border-success-300 bg-success-50'
+              : 'border-brand-200 bg-brand-100'
+          }`}
+          initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: reduceMotion ? 0 : 0.32,
+            ease: 'easeOut',
+          }}
+          key={isReady ? 'ready' : 'waiting'}
+        >
+          {isReady ? (
+            <>
+              <p className="font-display text-4xl leading-tight text-success-700">
+                Your order is ready! 🎉
+              </p>
+              <p className="mt-2 text-base text-success-600">Enjoy your meal!</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-brand-700">Order status</p>
+              <p className="mt-1 text-lg font-semibold capitalize text-brand-900">
+                {orderStatus}
+              </p>
+              <p className="mt-1 text-sm text-brand-600">We&apos;re preparing your order.</p>
+            </>
+          )}
+        </motion.div>
 
         <div className="my-6 w-full border-t border-brand-200" />
 

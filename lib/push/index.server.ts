@@ -33,6 +33,7 @@ export async function saveSubscription(
       {
         staff_id: staffId,
         restaurant_id: restaurantId,
+        subscriber_type: 'staff',
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
@@ -45,6 +46,7 @@ export async function saveSubscription(
     throw error
   }
 }
+
 
 export async function deleteSubscription(endpoint: string): Promise<void> {
   const supabase = getServiceClient()
@@ -60,6 +62,7 @@ export async function deleteSubscription(endpoint: string): Promise<void> {
   }
 }
 
+// Sends to staff subscriptions only (not customer subscriptions)
 export async function sendPushToRestaurant(
   restaurantId: string,
   payload: { title: string; body: string }
@@ -70,29 +73,35 @@ export async function sendPushToRestaurant(
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
     .eq('restaurant_id', restaurantId)
+    .eq('subscriber_type', 'staff')
 
   if (error) {
     console.error('[Push] Failed to fetch subscriptions:', error.message)
     return
   }
 
+  console.log('[Push] sendPushToRestaurant — restaurant:', restaurantId, '— staff subs found:', subs?.length ?? 0, '— payload title:', payload.title)
   if (!subs || subs.length === 0) return
 
   const results = await Promise.allSettled(
-    subs.map(sub =>
-      webpush.sendNotification(
+    subs.map((sub, i) => {
+      console.log(`[Push] Sending to endpoint ${i + 1}/${subs.length}:`, sub.endpoint.slice(0, 40) + '…')
+      return webpush.sendNotification(
         {
           endpoint: sub.endpoint,
           keys: { p256dh: sub.p256dh, auth: sub.auth },
         },
         JSON.stringify(payload)
       )
-    )
+    })
   )
 
   results.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      console.error('[Push] Failed to send to endpoint', subs[i].endpoint, result.reason)
+    if (result.status === 'fulfilled') {
+      console.log(`[Push] Sent OK to endpoint ${i + 1}:`, subs[i].endpoint.slice(0, 40) + '…', '— status:', result.value.statusCode)
+    } else {
+      console.error(`[Push] Failed to send to endpoint ${i + 1}:`, subs[i].endpoint.slice(0, 40) + '…', result.reason)
     }
   })
 }
+

@@ -11,6 +11,7 @@ type ApiResponse = {
     id: string
     order_number: number
     total: number
+    status: 'pending' | 'confirmed' | 'ready' | 'closed'
     payment_status: string
     session_id: string | null
   }
@@ -51,16 +52,19 @@ export default async function ConfirmationPage({
   const supabase = await createClient()
   const { data: restaurant } = await supabase
     .from('restaurants')
-    .select('currency')
+    .select('id, name, currency')
     .eq('slug', slug)
     .single()
 
   const currency = restaurant?.currency ?? 'EUR'
+  const restaurantId = restaurant?.id ?? ''
+  const restaurantName = (restaurant?.name as string | null) ?? ''
 
   const order: OrderPayload = {
     id: data.order.id,
     order_number: data.order.order_number,
     total: Number(data.order.total),
+    status: data.order.status,
     payment_status: data.order.payment_status,
     session_id: data.order.session_id,
   }
@@ -78,6 +82,8 @@ export default async function ConfirmationPage({
       currency={currency}
       order={order}
       items={items}
+      restaurantId={restaurantId}
+      restaurantName={restaurantName}
     />
   )
 }

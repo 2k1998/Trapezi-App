@@ -1,7 +1,6 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { sendOrderReadySMS } from '@/lib/sms'
 import { sendPushToRestaurant } from '@/lib/push/index.server'
 
 export async function markOrderReady(
@@ -16,45 +15,29 @@ export async function markOrderReady(
 
   if (error) return { success: false, error: error.message }
 
-  // Fetch order details needed for SMS and push — after update, order still exists
+  // Fetch order details for notifications — after update, order still exists
   try {
     const { data: order } = await supabase
       .from('orders')
-      .select('customer_phone, customer_locale, table_id, restaurant_id')
+      .select('table_id, restaurant_id')
       .eq('id', orderId)
       .single()
 
     if (order) {
-      const [tableResult, restaurantResult] = await Promise.all([
-        supabase.from('tables').select('table_number').eq('id', order.table_id).single(),
-        supabase.from('restaurants').select('name').eq('id', order.restaurant_id).single(),
-      ])
+      const tableResult = await supabase
+        .from('tables')
+        .select('table_number')
+        .eq('id', order.table_id)
+        .single()
 
       const tableNumber = tableResult.data?.table_number
-      const restaurantName = restaurantResult.data?.name ?? ''
 
-      // SMS: order ready — fire-and-forget
-      if (order.customer_phone) {
-        sendOrderReadySMS({
-          customer_phone: order.customer_phone,
-          customer_locale: order.customer_locale ?? null,
-          restaurant_name: restaurantName,
-        })
-          .then(() =>
-            supabase
-              .from('orders')
-              .update({ sms_ready_sent_at: new Date().toISOString() })
-              .eq('id', orderId)
-          )
-          .catch(err => console.error('[Action] SMS ready failed for order', orderId, err))
-      }
-
-      // Push: order ready notification — fire-and-forget
+      // Push: order ready notification to cashier (staff) — fire-and-forget
       if (tableNumber !== undefined) {
         sendPushToRestaurant(order.restaurant_id, {
           title: `Order at Table ${tableNumber} marked as ready`,
           body: '',
-        }).catch(err => console.error('[Action] Push failed for order', orderId, err))
+        }).catch(err => console.error('[Action] Staff push failed for order', orderId, err))
       }
     }
   } catch (notifyErr) {

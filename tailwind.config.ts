@@ -26,6 +26,12 @@ export default {
           500: '#B8892E',
           600: '#8C6420',
         },
+        success: {
+          50: '#ECFDF3',
+          300: '#86EFAC',
+          600: '#16A34A',
+          700: '#15803D',
+        },
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'Inter', ...defaultTheme.fontFamily.sans],
