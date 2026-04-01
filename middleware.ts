@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
   // Non-customer routes: /login, /admin, /api, static assets, etc.
   
   const segments = path.split('/').filter(Boolean)
-  const isCustomSlug = segments.length > 0 && !['login', 'admin', 'api', '_next', 'favicon.ico'].includes(segments[0])
+  const isCustomSlug = segments.length > 0 && !['admin', 'api', '_next', 'favicon.ico'].includes(segments[0])
   const slug = isCustomSlug ? segments[0] : null
   
   // 4. SLUG VALIDATION (Customer-facing routes only)
@@ -44,8 +44,8 @@ export async function middleware(request: NextRequest) {
 
   if (isProtected) {
     if (!user) {
-      // Not logged in -> redirect to login
-      const loginUrl = new URL('/login', request.url)
+      // Not logged in -> redirect to slug-scoped login
+      const loginUrl = new URL(`/${segments[0]}/login`, request.url)
       return NextResponse.redirect(loginUrl)
     }
 
