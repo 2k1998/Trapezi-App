@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 // Called by the customer-facing confirmation screen after Stripe redirect.
 // Polls until the webhook has created the order in Supabase.
+// Uses the service role client to bypass RLS — this endpoint is
+// intentionally unauthenticated (customer lands here after payment).
 export async function GET(request: NextRequest) {
   const pi = request.nextUrl.searchParams.get('pi')
   const slug = request.nextUrl.searchParams.get('slug')
@@ -13,20 +15,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = createServiceClient()
+
+  // Resolve slug → restaurant for logging purposes
+  const { data: restaurant, error: restaurantError } = await supabase
+    .from('restaurants')
+    .select('id, name')
+    .eq('slug', slug)
+    .single()
+
+  console.log('[by-payment-intent] restaurant lookup:', { slug, restaurant, error: restaurantError })
 
   // Stripe payment intent IDs are globally unique — no need to filter by
-  // restaurant_id. Removing the slug→restaurant join eliminates a second
-  // failure point and avoids a 404 if the restaurant lookup ever fails.
-  const { data: order, error } = await supabase
+  // restaurant_id. The slug lookup above is for logging only.
+  const { data: order, error: orderError } = await supabase
     .from('orders')
     .select('id, order_number, status, total, table_id, created_at')
     .eq('stripe_payment_intent_id', pi)
     .single()
 
-  console.log('[by-payment-intent] query result:', { order, error })
+  console.log('[by-payment-intent] order lookup:', { pi, order, error: orderError })
 
-  if (error || !order) {
+  if (orderError || !order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
