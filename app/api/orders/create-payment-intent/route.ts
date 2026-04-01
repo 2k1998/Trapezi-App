@@ -76,12 +76,15 @@ export async function POST(request: NextRequest) {
     // In development only, allow a bypass that charges the platform account directly.
     // This bypass NEVER fires in production — production requires stripe_account_id.
     const useConnect = !!restaurant.stripe_account_id
-    const isDevMode = process.env.NODE_ENV === 'development' && !useConnect
-    if (!useConnect && !isDevMode) {
-      return NextResponse.json(
-        { error: 'This restaurant has not connected their payment account yet. Please pay at the counter.' },
-        { status: 400 }
-      )
+    if (!useConnect) {
+      if (process.env.NODE_ENV === 'development') {
+        // dev bypass — charge platform account directly, no Connect routing
+      } else {
+        return NextResponse.json(
+          { error: 'Payment not configured for this restaurant' },
+          { status: 400 }
+        )
+      }
     }
 
     // Fetch table — verify it belongs to this restaurant
@@ -243,7 +246,7 @@ export async function POST(request: NextRequest) {
       session_id: resolvedSessionId,
     })
   } catch (err) {
-    console.error('create-payment-intent error:', err)
+    console.error('[create-payment-intent] Error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
