@@ -73,10 +73,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Stripe Connect: restaurant must have a connected account to accept payments.
-    // In development, allow a bypass that charges the platform account directly.
-    // This bypass NEVER fires in production.
+    // In development only, allow a bypass that charges the platform account directly.
+    // This bypass NEVER fires in production — production requires stripe_account_id.
     const useConnect = !!restaurant.stripe_account_id
-    if (!useConnect && process.env.NODE_ENV !== 'development') {
+    const isDevMode = process.env.NODE_ENV === 'development' && !useConnect
+    if (!useConnect && !isDevMode) {
       return NextResponse.json(
         { error: 'This restaurant has not connected their payment account yet. Please pay at the counter.' },
         { status: 400 }
