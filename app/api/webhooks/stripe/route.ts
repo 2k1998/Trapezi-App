@@ -70,7 +70,20 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Find the pending order. Idempotency: if already paid, Stripe is retrying — do nothing.
+    // Idempotency guard 1: check if any order is already confirmed for this PaymentIntent.
+    // Catches the edge case where the same PI is linked to more than one order row.
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('stripe_payment_intent_id', paymentIntent.id)
+      .maybeSingle()
+
+    if (existingOrder) {
+      console.log('[webhook] Order already confirmed for PI, skipping:', paymentIntent.id)
+      return Response.json({ received: true })
+    }
+
+    // Find the pending order. Idempotency guard 2: if already paid, Stripe is retrying — do nothing.
     const { data: pendingOrder } = await supabase
       .from('orders')
       .select('id, payment_status, table_id, total')
