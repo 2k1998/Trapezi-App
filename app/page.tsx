@@ -1,3 +1,7 @@
+export const metadata = {
+  title: 'Trapezi',
+}
+
 export default function HomePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-50 px-6">

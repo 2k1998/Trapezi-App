@@ -1,7 +1,36 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { MenuClient } from '@/components/menu/MenuClient'
 import type { MenuItemRow } from '@/components/menu/MenuItemCard'
 import { createClient } from '@/lib/supabase/server'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = await createClient()
+  const { data: restaurant, error } = await supabase
+    .from('restaurants')
+    .select('name')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .single()
+
+  if (error || !restaurant) {
+    notFound()
+  }
+
+  const name =
+    typeof restaurant.name === 'string'
+      ? restaurant.name
+      : 'Restaurant'
+
+  return {
+    title: `${name} — Trapezi`,
+  }
+}
 
 function parseTable(raw: string | undefined): {
   tableNumber: number | null

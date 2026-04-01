@@ -1,6 +1,34 @@
+import type { Metadata } from 'next'
 import { getOpenOrdersWithItems, getTablesForRestaurant } from '@/lib/cashier/index.server'
 import { createClient } from '@/lib/supabase/server'
 import { CashierScreen } from '@/components/cashier/CashierScreen'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = await createClient()
+  const { data: restaurant } = await supabase
+    .from('restaurants')
+    .select('name')
+    .eq('slug', slug)
+    .single()
+
+  if (!restaurant) {
+    return { title: 'Cashier | Trapezi' }
+  }
+
+  const name =
+    typeof restaurant.name === 'string'
+      ? restaurant.name
+      : 'Restaurant'
+
+  return {
+    title: `${name} — Cashier | Trapezi`,
+  }
+}
 
 export default async function CashierPage({
   params,
