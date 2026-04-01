@@ -9,8 +9,6 @@ export const runtime = 'nodejs'
 
 const ATHENS_TZ = 'Europe/Athens'
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
-
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,10 +47,16 @@ function formatWeekDate(d: Date): string {
 }
 
 export async function GET(request: NextRequest) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[Cron] RESEND_API_KEY not set — skipping')
+    return new Response('RESEND_API_KEY not configured', { status: 200 })
+  }
+
   if (request.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  const resend = new Resend(process.env.RESEND_API_KEY)
   const supabase = getServiceClient()
   const { start: weekStart, end: weekEnd } = buildWeekRange(1)
   const { start: prevStart, end: prevEnd } = buildWeekRange(2)

@@ -51,7 +51,7 @@ export async function getOrCreatePushSubscription(): Promise<PushSubscription | 
 
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
     })
     return subscription
   } catch (err) {
@@ -86,7 +86,7 @@ export async function subscribeUserToPush(): Promise<PushSubscription | null> {
 
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
     })
     console.log('[Push] pushManager.subscribe() succeeded. Endpoint:', subscription.endpoint.slice(0, 40) + '…')
 
