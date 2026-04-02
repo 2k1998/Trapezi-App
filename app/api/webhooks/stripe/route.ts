@@ -22,6 +22,10 @@ export async function POST(request: NextRequest) {
   // Read raw body — required for Stripe signature verification
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
+  // Present when the event originates from a connected account
+  const stripeAccount = request.headers.get('stripe-account')
+
+  console.log('[webhook] incoming:', { stripeAccount })
 
   if (!signature) {
     return new Response('Missing stripe-signature header', { status: 400 })
@@ -29,6 +33,9 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event
   try {
+    // constructEvent uses the same webhook secret regardless of whether the
+    // event is from the platform or a connected account. The account ID is
+    // available via the Stripe-Account header and on event.account.
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -38,6 +45,8 @@ export async function POST(request: NextRequest) {
     console.error('Webhook signature verification failed:', err)
     return new Response('Invalid signature', { status: 400 })
   }
+
+  console.log('[webhook] event:', { type: event.type, account: event.account ?? stripeAccount })
 
   // Only handle payment_intent.succeeded — return 200 for everything else
   if (event.type !== 'payment_intent.succeeded') {
