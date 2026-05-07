@@ -171,7 +171,7 @@ export default function OwnerSettingsPage() {
           ...(data.colors_extracted && data.secondary_color && { secondary_color: data.secondary_color }),
         }
       })
-      setLayoutBranding(prev => {
+      setLayoutBranding((prev: typeof layoutBranding) => {
         if (!prev) return prev
         return {
           ...prev,
