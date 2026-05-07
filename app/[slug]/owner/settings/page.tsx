@@ -171,15 +171,12 @@ export default function OwnerSettingsPage() {
           ...(data.colors_extracted && data.secondary_color && { secondary_color: data.secondary_color }),
         }
       })
-      setLayoutBranding((prev: BrandingSettings) => {
-        if (!prev) return prev as BrandingSettings
-        return {
-          ...prev,
-          logo_url: data.logo_url ?? null,
-          ...(data.colors_extracted && data.accent_color && { accent_color: data.accent_color }),
-          ...(data.colors_extracted && data.secondary_color && { secondary_color: data.secondary_color }),
-        }
-      })
+      setLayoutBranding({
+        ...layoutBranding,
+        logo_url: data.logo_url ?? null,
+        ...(data.colors_extracted && data.accent_color && { accent_color: data.accent_color }),
+        ...(data.colors_extracted && data.secondary_color && { secondary_color: data.secondary_color }),
+      } as BrandingSettings)
       if (data.colors_extracted) {
         showSuccess('Logo uploaded — colors extracted from your logo. Feel free to adjust them.')
       } else {
