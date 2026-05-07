@@ -194,7 +194,7 @@ export default function OwnerSettingsPage() {
     try {
       await apiSendJson('/api/settings/branding', 'PATCH', { restaurantId, logo_url: null })
       setBranding(prev => (prev ? { ...prev, logo_url: null } : prev))
-      setLayoutBranding(prev => (prev ? { ...prev, logo_url: null } : prev))
+      setLayoutBranding({ ...layoutBranding, logo_url: null } as BrandingSettings)
       showSuccess('Logo removed')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove logo')
