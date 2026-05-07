@@ -9,6 +9,7 @@ import type { PrinterConfig } from '@/lib/printing/qztray'
 import { PushPermissionBanner } from '@/components/staff/PushPermissionBanner'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
+import { AvailabilityPanel } from './AvailabilityPanel'
 
 type Props = {
   restaurantId: string
@@ -17,6 +18,9 @@ type Props = {
   printerConfig: PrinterConfig | null
   initialTables: TableRow[]
   initialOrders: OrderWithItems[]
+  staffRole?: string | null
+  defaultMenuId?: string | null
+  plan?: string
 }
 
 function orderSessionId(order: Order): string {
@@ -38,9 +42,44 @@ export function CashierScreen({
   printerConfig,
   initialTables,
   initialOrders,
+  staffRole = null,
+  defaultMenuId = null,
+  plan = 'free',
 }: Props) {
   const [tables, setTables] = useState<TableRow[]>(initialTables)
   const [orders, setOrders] = useState<OrderWithItems[]>(initialOrders)
+  const [branding, setBranding] = useState<{ logoUrl: string | null; accentColor: string }>({
+    logoUrl: null,
+    accentColor: '#1A1916',
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    const loadBranding = async () => {
+      try {
+        const res = await fetch(
+          `/api/settings/branding?restaurantId=${encodeURIComponent(restaurantId)}`,
+          { credentials: 'include' }
+        )
+        if (!res.ok) return
+        const data = (await res.json()) as { logo_url?: string | null; accent_color?: string | null }
+        if (cancelled) return
+        setBranding({
+          logoUrl: typeof data.logo_url === 'string' ? data.logo_url : null,
+          accentColor:
+            typeof data.accent_color === 'string' && data.accent_color.length > 0
+              ? data.accent_color
+              : '#1A1916',
+        })
+      } catch {
+        // Silent fallback to default accent and no logo.
+      }
+    }
+    void loadBranding()
+    return () => {
+      cancelled = true
+    }
+  }, [restaurantId])
 
   const initialSessionGroups = useMemo(
     () => groupOrdersBySession(initialTables, initialOrders),
@@ -331,22 +370,30 @@ export function CashierScreen({
       <div className="flex min-h-0 flex-1 w-full">
         <LeftPanel
           restaurantName={restaurantName}
+          logoUrl={branding.logoUrl}
           sessionGroups={sessionGroups}
           allTables={tables}
+          plan={plan}
           selectedSessionId={selectedSessionId}
           onSelectSession={handleSelectSession}
           notificationPermission={notificationPermission}
           onRequestPushPrompt={handleRequestPushPrompt}
         />
 
-        <RightPanel
-          selectedSession={selectedSession}
-          selectedSessionId={selectedSessionId}
-          currency={currency}
-          newOrderIdMap={newOrderIdMap}
-          onMarkReady={handleMarkReady}
-          onRequestCloseTab={handleCloseTab}
-        />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <RightPanel
+            selectedSession={selectedSession}
+            selectedSessionId={selectedSessionId}
+            currency={currency}
+            newOrderIdMap={newOrderIdMap}
+            onMarkReady={handleMarkReady}
+            onRequestCloseTab={handleCloseTab}
+            accentColor={branding.accentColor}
+          />
+          {staffRole === 'cashier' && defaultMenuId ? (
+            <AvailabilityPanel restaurantId={restaurantId} defaultMenuId={defaultMenuId} />
+          ) : null}
+        </div>
       </div>
     </div>
   )

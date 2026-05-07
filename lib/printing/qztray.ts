@@ -3,6 +3,7 @@ import {
   generateKitchenSlip,
   generateBarSlip,
   generateCashierSlip,
+  type SlipBranding,
 } from './escpos'
 
 export type PrinterConfig = {
@@ -85,10 +86,11 @@ export async function printOrder(
   config: PrinterConfig,
   restaurantName: string,
   tableNumber?: number,
+  branding?: SlipBranding,
 ): Promise<PrintResult> {
-  const kitchenCommands = generateKitchenSlip(order, restaurantName, tableNumber)
-  const barCommands = generateBarSlip(order, restaurantName, tableNumber)
-  const cashierCommands = generateCashierSlip(order, restaurantName, tableNumber)
+  const kitchenCommands = generateKitchenSlip(order, restaurantName, tableNumber, branding)
+  const barCommands = generateBarSlip(order, restaurantName, tableNumber, branding)
+  const cashierCommands = generateCashierSlip(order, restaurantName, tableNumber, branding)
 
   let socket: WebSocket | null = null
 

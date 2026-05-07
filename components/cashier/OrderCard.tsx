@@ -21,11 +21,13 @@ export function OrderCard({
   currency,
   isNew,
   onMarkReady,
+  accentColor,
 }: {
   order: OrderWithItems
   currency: string
   isNew: boolean
   onMarkReady: (orderId: string) => Promise<void>
+  accentColor: string
 }) {
   const reduceMotion = useReducedMotion()
   const [markPending, setMarkPending] = useState(false)
@@ -128,8 +130,9 @@ export function OrderCard({
           className={`w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
             order.status === 'ready'
               ? 'cursor-not-allowed bg-brand-100 text-brand-600'
-              : 'bg-brand-800 text-white hover:bg-brand-700'
+              : 'text-white'
           } disabled:opacity-60`}
+          style={order.status === 'ready' ? undefined : { backgroundColor: accentColor }}
         >
           Mark as Ready
         </button>

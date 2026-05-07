@@ -1,9 +1,10 @@
-import { DashboardShell } from '@/components/staff/DashboardShell'
+import { redirect } from 'next/navigation'
 
-export default function DashboardPage() {
-  return (
-    <DashboardShell>
-      <div className="p-6 text-sm text-brand-600">Dashboard coming soon.</div>
-    </DashboardShell>
-  )
+export default async function DashboardPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  redirect(`/${slug}/owner/menu`)
 }

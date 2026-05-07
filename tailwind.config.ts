@@ -1,5 +1,4 @@
 import type { Config } from 'tailwindcss'
-import defaultTheme from 'tailwindcss/defaultTheme'
 
 export default {
   content: [
@@ -10,21 +9,29 @@ export default {
     extend: {
       colors: {
         brand: {
-          50:  '#FAFAF7',
-          100: '#F2F1EB',
-          200: '#E3E1D9',
-          300: '#C8C5BB',
-          400: '#9D9A8E',
-          500: '#6B6860',
-          600: '#3D3C37',
-          700: '#2A2925',
-          800: '#1A1916',
-          900: '#0F0E0D',
+          50:  '#F0F6FC',
+          100: '#DCE9F5',
+          200: '#B9D3EB',
+          300: '#8BB6DC',
+          400: '#5693C8',
+          500: '#2C74B5',
+          600: '#1D5F9E',
+          700: '#184E85',
+          800: '#11386A',
+          900: '#0A2B54',
+          950: '#072E5A',
         },
         accent: {
-          400: '#D4A853',
-          500: '#B8892E',
-          600: '#8C6420',
+          50:  '#EEF6FF',
+          100: '#D9EBFF',
+          200: '#B3D6FF',
+          300: '#7DB8F7',
+          400: '#4A96EC',
+          500: '#1D6FBF',
+          600: '#1860A8',
+          700: '#134F8A',
+          800: '#0F3D6B',
+          900: '#0A2D50',
         },
         success: {
           50: '#ECFDF3',
@@ -34,8 +41,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'Inter', ...defaultTheme.fontFamily.sans],
-        display: ['var(--font-playfair)', 'Playfair Display', ...defaultTheme.fontFamily.serif],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+        sans:    ['var(--font-sans)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'premium': '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',

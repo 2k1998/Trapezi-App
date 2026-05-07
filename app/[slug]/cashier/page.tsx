@@ -38,9 +38,24 @@ export default async function CashierPage({
   const { slug } = await params
 
   const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let staffRole: string | null = null
+  if (user) {
+    const { data: staffRow } = await supabase
+      .from('staff')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    staffRole = staffRow?.role ?? null
+  }
+
   const { data: restaurant } = await supabase
     .from('restaurants')
-    .select('id, name, currency, metadata')
+    .select('id, name, currency, metadata, plan')
     .eq('slug', slug)
     .single()
 
@@ -52,10 +67,17 @@ export default async function CashierPage({
     )
   }
 
-  const [tables, orders] = await Promise.all([
+  const [tables, orders, defaultMenuRes] = await Promise.all([
     getTablesForRestaurant(restaurant.id),
     getOpenOrdersWithItems(restaurant.id),
+    supabase
+      .from('menus')
+      .select('id')
+      .eq('restaurant_id', restaurant.id)
+      .eq('is_default', true)
+      .maybeSingle(),
   ])
+  const defaultMenu = defaultMenuRes.data
 
   const printers = (restaurant.metadata as Record<string, unknown> | null)?.printers
   const printerConfig =
@@ -75,6 +97,9 @@ export default async function CashierPage({
       printerConfig={printerConfig}
       initialTables={tables}
       initialOrders={orders}
+      staffRole={staffRole}
+      defaultMenuId={defaultMenu?.id ?? null}
+      plan={restaurant.plan ?? 'free'}
     />
   )
 }

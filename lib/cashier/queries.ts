@@ -8,13 +8,23 @@ export async function getTablesForRestaurant(
 
   const { data, error } = await supabase
     .from('tables')
-    .select('id, table_number, label, status')
+    .select('id, table_number, label, status, sections(name)')
     .eq('restaurant_id', restaurantId)
     .order('table_number', { ascending: true })
 
   if (error) throw new Error(error.message)
 
-  return (data ?? []) as TableRow[]
+  return (data ?? []).map(row => ({
+    id: row.id,
+    table_number: row.table_number,
+    label: row.label,
+    status: row.status,
+    section_name: row.sections
+      ? (Array.isArray(row.sections)
+          ? (row.sections[0] as { name: string } | undefined)?.name
+          : (row.sections as { name: string }).name) ?? null
+      : null,
+  })) as TableRow[]
 }
 
 export async function getOpenOrdersWithItems(

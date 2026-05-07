@@ -21,6 +21,7 @@ export function RightPanel({
   newOrderIdMap,
   onMarkReady,
   onRequestCloseTab,
+  accentColor,
 }: {
   selectedSession: SessionGroup | null
   selectedSessionId: string | null
@@ -31,6 +32,7 @@ export function RightPanel({
     sessionId: string,
     tableId: string
   ) => Promise<{ success: boolean; error?: string }>
+  accentColor: string
 }) {
   const reduceMotion = useReducedMotion()
 
@@ -88,6 +90,7 @@ export function RightPanel({
               currency={currency}
               isNew={!!newOrderIdMap[order.id]}
               onMarkReady={onMarkReady}
+              accentColor={accentColor}
             />
           ))}
         </div>
@@ -98,7 +101,8 @@ export function RightPanel({
           type="button"
           onClick={() => setCloseOpen(true)}
           disabled={closePending}
-          className="w-full rounded-xl bg-brand-800 px-6 py-3 text-base font-medium text-white shadow-premium disabled:opacity-50"
+          className="w-full rounded-xl px-6 py-3 text-base font-medium text-white shadow-premium disabled:opacity-50"
+          style={{ backgroundColor: accentColor }}
         >
           Close Tab
         </button>
@@ -112,6 +116,7 @@ export function RightPanel({
         onCancel={() => setCloseOpen(false)}
         onConfirm={closeSession}
         confirmPending={closePending}
+        accentColor={accentColor}
       />
     </section>
   )

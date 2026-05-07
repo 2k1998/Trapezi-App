@@ -64,19 +64,40 @@ function buildItemLines(items: OrderWithItems['order_items']): string[] {
   return lines
 }
 
+function buildReceiptHeader(text: string): string[] {
+  const lines = text.split('\n').map(line => ESC_CENTER + line.slice(0, PAPER_WIDTH) + '\n')
+  return [...lines, ESC_LEFT, '-'.repeat(PAPER_WIDTH) + '\n']
+}
+
+function buildReceiptFooter(text: string): string[] {
+  const lines = text.split('\n').map(line => ESC_CENTER + line.slice(0, PAPER_WIDTH) + '\n')
+  return ['-'.repeat(PAPER_WIDTH) + '\n', ...lines]
+}
+
 function buildFooter(): string[] {
   return ['\n', '\n', ESC_CUT]
+}
+
+export type SlipBranding = {
+  receipt_header?: string | null
+  receipt_footer?: string | null
+  isPro?: boolean
 }
 
 export function generateKitchenSlip(
   order: OrderWithItems,
   restaurantName: string,
   tableNumber?: number,
+  branding?: SlipBranding,
 ): string[] {
   const items = order.order_items.filter(i => i.type === 'food')
+  const header = branding?.isPro && branding.receipt_header ? buildReceiptHeader(branding.receipt_header) : []
+  const footer = branding?.isPro && branding.receipt_footer ? buildReceiptFooter(branding.receipt_footer) : []
   return [
+    ...header,
     ...buildHeader('*** KITCHEN ***', order, restaurantName, tableNumber),
     ...buildItemLines(items),
+    ...footer,
     ...buildFooter(),
   ]
 }
@@ -85,11 +106,16 @@ export function generateBarSlip(
   order: OrderWithItems,
   restaurantName: string,
   tableNumber?: number,
+  branding?: SlipBranding,
 ): string[] {
   const items = order.order_items.filter(i => i.type === 'drink')
+  const header = branding?.isPro && branding.receipt_header ? buildReceiptHeader(branding.receipt_header) : []
+  const footer = branding?.isPro && branding.receipt_footer ? buildReceiptFooter(branding.receipt_footer) : []
   return [
+    ...header,
     ...buildHeader('*** BAR ***', order, restaurantName, tableNumber),
     ...buildItemLines(items),
+    ...footer,
     ...buildFooter(),
   ]
 }
@@ -98,15 +124,20 @@ export function generateCashierSlip(
   order: OrderWithItems,
   restaurantName: string,
   tableNumber?: number,
+  branding?: SlipBranding,
 ): string[] {
   const totalLine = formatLine('TOTAL:', order.total.toFixed(2), PAPER_WIDTH)
+  const header = branding?.isPro && branding.receipt_header ? buildReceiptHeader(branding.receipt_header) : []
+  const footer = branding?.isPro && branding.receipt_footer ? buildReceiptFooter(branding.receipt_footer) : []
   return [
+    ...header,
     ...buildHeader('*** CASHIER ***', order, restaurantName, tableNumber),
     ...buildItemLines(order.order_items),
     '-'.repeat(PAPER_WIDTH) + '\n',
     ESC_BOLD_ON,
     totalLine + '\n',
     ESC_BOLD_OFF,
+    ...footer,
     ...buildFooter(),
   ]
 }

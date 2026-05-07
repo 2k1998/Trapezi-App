@@ -11,6 +11,7 @@ export function CloseTabModal({
   onCancel,
   onConfirm,
   confirmPending,
+  accentColor,
 }: {
   isOpen: boolean
   tableNumber: number
@@ -19,6 +20,7 @@ export function CloseTabModal({
   onCancel: () => void
   onConfirm: () => Promise<void>
   confirmPending: boolean
+  accentColor: string
 }) {
   const reduceMotion = useReducedMotion()
 
@@ -63,7 +65,8 @@ export function CloseTabModal({
                   await onConfirm()
                 }}
                 disabled={confirmPending}
-                className="w-1/2 rounded-xl bg-brand-800 py-3 text-sm font-medium text-white shadow-premium disabled:opacity-60"
+                className="w-1/2 rounded-xl py-3 text-sm font-medium text-white shadow-premium disabled:opacity-60"
+                style={{ backgroundColor: accentColor }}
               >
                 {confirmPending ? 'Closing…' : 'Confirm — Close Tab'}
               </button>

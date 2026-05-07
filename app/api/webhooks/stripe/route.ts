@@ -3,26 +3,38 @@ import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { stripe } from '@/lib/stripe/server'
 import { sendPushToRestaurant } from '@/lib/push/index.server'
+import { handleBillingEvent } from '@/lib/billing/webhook-handler'
 
 // Must run in Node.js runtime — Edge runtime lacks crypto and Stripe needs it
 export const runtime = 'nodejs'
+
+const BILLING_EVENT_PREFIXES = ['invoice.', 'customer.subscription.']
+
+function isBillingEvent(eventType: string): boolean {
+  return BILLING_EVENT_PREFIXES.some(prefix => eventType.startsWith(prefix))
+}
 
 const methodMap: Record<string, 'card' | 'apple_pay' | 'google_pay'> = {
   card: 'card',
   apple_pay: 'apple_pay',
   google_pay: 'google_pay',
-  link: 'card', // Stripe Link falls back to card in our enum
+  link: 'card',
 }
 
 function mapPaymentMethod(pi: Stripe.PaymentIntent): 'card' | 'apple_pay' | 'google_pay' {
   return methodMap[pi.payment_method_types?.[0]] ?? 'card'
 }
 
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
 export async function POST(request: NextRequest) {
-  // Read raw body — required for Stripe signature verification
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
-  // Present when the event originates from a connected account
   const stripeAccount = request.headers.get('stripe-account')
 
   console.log('[webhook] incoming:', { stripeAccount })
@@ -31,16 +43,22 @@ export async function POST(request: NextRequest) {
     return new Response('Missing stripe-signature header', { status: 400 })
   }
 
+  // Peek at event type before full verification to pick the right secret.
+  // We do a lightweight JSON parse just to read the type field.
+  let eventTypePeek: string
+  try {
+    eventTypePeek = (JSON.parse(body) as { type: string }).type ?? ''
+  } catch {
+    return new Response('Invalid JSON body', { status: 400 })
+  }
+
+  const webhookSecret = isBillingEvent(eventTypePeek)
+    ? process.env.STRIPE_BILLING_WEBHOOK_SECRET!
+    : process.env.STRIPE_WEBHOOK_SECRET!
+
   let event: Stripe.Event
   try {
-    // constructEvent uses the same webhook secret regardless of whether the
-    // event is from the platform or a connected account. The account ID is
-    // available via the Stripe-Account header and on event.account.
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch (err) {
     console.error('Webhook signature verification failed:', err)
     return new Response('Invalid signature', { status: 400 })
@@ -48,14 +66,24 @@ export async function POST(request: NextRequest) {
 
   console.log('[webhook] event:', { type: event.type, account: event.account ?? stripeAccount })
 
-  // Only handle payment_intent.succeeded — return 200 for everything else
+  // Route billing events to the billing handler
+  if (isBillingEvent(event.type)) {
+    try {
+      const supabase = getServiceClient()
+      await handleBillingEvent(event, supabase)
+    } catch (err) {
+      console.error('[webhook] Billing event handler failed:', { type: event.type, err })
+    }
+    return Response.json({ received: true })
+  }
+
+  // Return 200 for non-payment_intent events
   if (event.type !== 'payment_intent.succeeded') {
     return Response.json({ received: true })
   }
 
   const paymentIntent = event.data.object as Stripe.PaymentIntent
 
-  // Ignore events that aren't from our platform (no pending_order_id in metadata)
   if (!paymentIntent.metadata?.pending_order_id) {
     return Response.json({ received: true })
   }
@@ -73,14 +101,8 @@ export async function POST(request: NextRequest) {
       customer_phone: string
     }
 
-    // Service role client — bypasses RLS to confirm the pending order
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = getServiceClient()
 
-    // Idempotency guard 1: check if any order is already confirmed for this PaymentIntent.
-    // Catches the edge case where the same PI is linked to more than one order row.
     const { data: existingOrder } = await supabase
       .from('orders')
       .select('id')
@@ -92,7 +114,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ received: true })
     }
 
-    // Find the pending order. Idempotency guard 2: if already paid, Stripe is retrying — do nothing.
     const { data: pendingOrder } = await supabase
       .from('orders')
       .select('id, payment_status, table_id, total')
@@ -107,7 +128,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ received: true })
     }
 
-    // Confirm the order — items already exist from create-payment-intent
     const { error: updateError } = await supabase
       .from('orders')
       .update({
@@ -122,14 +142,11 @@ export async function POST(request: NextRequest) {
       throw new Error(`Order confirmation failed: ${updateError.message}`)
     }
 
-    // Mark table as occupied
     await supabase
       .from('tables')
       .update({ status: 'occupied' })
       .eq('id', pendingOrder.table_id)
 
-    // --- Push: new order notification to cashier ---
-    // Fire-and-forget. Never blocks the webhook response.
     try {
       const { data: orderItems } = await supabase
         .from('order_items')
@@ -148,11 +165,8 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (err) {
-    // Log with PaymentIntent ID for manual recovery — but still return 200.
-    // Non-200 would cause Stripe to retry and potentially re-confirm the order.
-    // The idempotency check above provides a safety net for retries.
     console.error('Webhook order confirmation failed', {
-      paymentIntentId: paymentIntent.id,
+      paymentIntentId: (event.data.object as Stripe.PaymentIntent).id,
       error: err,
     })
   }

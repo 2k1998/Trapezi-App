@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('colorthief'\\); require\\('jimp'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e \"const CT = require\\('colorthief'\\); console.log\\(typeof CT, typeof CT.getColor, typeof CT.getPalette\\); const ct = new CT\\(\\); console.log\\('instance ok'\\)\")",
+      "Bash(npx supabase *)"
+    ]
+  }
+}

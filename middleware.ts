@@ -40,6 +40,7 @@ export async function middleware(request: NextRequest) {
                       path.includes('/bar') || 
                       path.includes('/cashier') || 
                       path.includes('/dashboard') || 
+                      path.includes('/owner') || 
                       path.startsWith('/admin')
 
   if (isProtected) {
@@ -70,7 +71,9 @@ export async function middleware(request: NextRequest) {
       } else if (userRole === 'cashier') {
         expectedPrefix = `/${userRestaurantSlug}/cashier`
       } else if (userRole === 'owner') {
-        expectedPrefix = `/${userRestaurantSlug}/dashboard`
+        expectedPrefix = `/${userRestaurantSlug}/owner`
+      } else if (userRole === 'manager') {
+        expectedPrefix = `/${userRestaurantSlug}/owner`
       }
 
       if (expectedPrefix && !path.startsWith(expectedPrefix)) {

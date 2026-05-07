@@ -61,7 +61,7 @@ export default async function MenuPage({
   const { data: restaurant, error: restError } = await supabase
     .from('restaurants')
     .select(
-      'id, name, slug, plan, languages, default_language, accent_color, logo_url, currency'
+      'id, name, slug, plan, languages, default_language, accent_color, logo_url, currency, metadata'
     )
     .eq('slug', slug)
     .eq('is_active', true)
@@ -107,22 +107,57 @@ export default async function MenuPage({
     items: byCategory.get(category)!,
   }))
 
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000'
+  const brandingRes = await fetch(
+    `${base}/api/settings/branding?restaurantId=${encodeURIComponent(restaurant.id)}`,
+    { cache: 'no-store' }
+  )
+  const branding = brandingRes.ok
+    ? ((await brandingRes.json()) as Record<string, unknown>)
+    : {}
+
+  // Pro plan: use branding overrides; other plans: use direct columns only
+  const isPro = restaurant.plan === 'pro' || restaurant.plan === 'enterprise'
+  const accentColor = (branding.accent_color as string | null) ?? restaurant.accent_color
+  const logoUrl = (branding.logo_url as string | null) ?? restaurant.logo_url
+  const brandingFont = isPro ? ((branding.font as string | null) ?? null) : null
+  const secondaryColor = isPro ? ((branding.secondary_color as string | null) ?? null) : null
+  const confirmationMessageEl = isPro ? ((branding.confirmation_message_el as string | null) ?? null) : null
+  const confirmationMessageEn = isPro ? ((branding.confirmation_message_en as string | null) ?? null) : null
+
+  const fontHrefMap: Record<string, string> = {
+    Inter: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+    'Playfair Display': 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap',
+    Lora: 'https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap',
+    Montserrat: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap',
+    Raleway: 'https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap',
+  }
+  const fontHref = brandingFont ? fontHrefMap[brandingFont] : null
+
   return (
-    <MenuClient
-      restaurant={{
-        id: restaurant.id,
-        name: restaurant.name,
-        slug: restaurant.slug,
-        plan: restaurant.plan,
-        languages: restaurant.languages ?? ['en'],
-        default_language: restaurant.default_language,
-        accent_color: restaurant.accent_color,
-        logo_url: restaurant.logo_url,
-        currency: restaurant.currency,
-      }}
-      groupedItems={groupedItems}
-      tableNumber={tableNumber}
-      tableError={tableError}
-    />
+    <>
+      {isPro && fontHref ? <link rel="stylesheet" href={fontHref} /> : null}
+      <MenuClient
+        restaurant={{
+          id: restaurant.id,
+          name: restaurant.name,
+          slug: restaurant.slug,
+          plan: restaurant.plan,
+          languages: restaurant.languages ?? ['en'],
+          default_language: restaurant.default_language,
+          accent_color: accentColor,
+          secondary_color: secondaryColor,
+          logo_url: logoUrl,
+          currency: restaurant.currency,
+          branding_font: brandingFont,
+          confirmation_message_el: confirmationMessageEl,
+          confirmation_message_en: confirmationMessageEn,
+        }}
+        groupedItems={groupedItems}
+        tableNumber={tableNumber}
+        tableError={tableError}
+      />
+    </>
   )
 }

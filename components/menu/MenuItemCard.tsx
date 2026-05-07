@@ -23,6 +23,9 @@ type Props = {
   addItem: (item: Omit<CartItem, 'quantity'>) => void
   updateQuantity: (menu_item_id: string, qty: number) => void
   getQuantity: (menu_item_id: string) => number
+  accent: string
+  secondary: string
+  fontPrimary: string
 }
 
 export function MenuItemCard({
@@ -32,6 +35,9 @@ export function MenuItemCard({
   addItem,
   updateQuantity,
   getQuantity,
+  accent,
+  secondary,
+  fontPrimary,
 }: Props) {
   const qty = getQuantity(item.id)
   const name = pickLocalized(item.name, lang)
@@ -42,14 +48,16 @@ export function MenuItemCard({
   const body = (
     <>
       {item.is_featured ? (
-        <span className="mb-1 inline-block text-xs text-accent-400">Chef&apos;s pick</span>
+        <span className="mb-1 inline-block rounded-full px-2 py-0.5 text-xs text-white" style={{ backgroundColor: secondary }}>
+          Chef&apos;s pick
+        </span>
       ) : null}
-      <span className="font-display text-lg text-brand-900">{name}</span>
+      <span className="text-lg text-brand-900" style={{ fontFamily: fontPrimary }}>{name}</span>
       {desc ? (
         <p className="text-sm text-brand-500 line-clamp-2">{desc}</p>
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="font-medium text-brand-800">{priceLabel}</span>
+        <span className="font-medium" style={{ color: accent }}>{priceLabel}</span>
         <QtyOrAdd
           qty={qty}
           onAdd={() =>
@@ -62,6 +70,8 @@ export function MenuItemCard({
             })
           }
           onDelta={d => updateQuantity(item.id, qty + d)}
+          accent={accent}
+          secondary={secondary}
         />
       </div>
     </>
@@ -71,7 +81,8 @@ export function MenuItemCard({
     <div
       className={`overflow-hidden rounded-xl ${
         item.image_url ? 'bg-white shadow-card' : 'bg-brand-100'
-      } ${item.is_featured ? 'border-l-2 border-accent-400' : ''}`}
+      }`}
+      style={{ border: item.is_featured ? `2px solid ${accent}33` : undefined }}
     >
       {item.image_url ? (
         <>
@@ -94,10 +105,14 @@ function QtyOrAdd({
   qty,
   onAdd,
   onDelta,
+  accent,
+  secondary,
 }: {
   qty: number
   onAdd: () => void
   onDelta: (d: number) => void
+  accent: string
+  secondary: string
 }) {
   const [mounted, setMounted] = useState(false)
 
@@ -113,7 +128,8 @@ function QtyOrAdd({
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white"
+        className="rounded-lg px-4 py-2 text-sm font-medium text-white"
+        style={{ backgroundColor: accent }}
       >
         Add
       </button>
@@ -125,7 +141,8 @@ function QtyOrAdd({
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white"
+        className="rounded-lg px-4 py-2 text-sm font-medium text-white"
+        style={{ backgroundColor: accent }}
       >
         Add
       </button>
@@ -133,7 +150,7 @@ function QtyOrAdd({
   }
 
   return (
-    <div className="flex h-9 items-center gap-3 rounded-lg bg-brand-100 px-2">
+    <div className="flex h-9 items-center gap-3 rounded-lg px-2" style={{ backgroundColor: `${secondary}22` }}>
       <button
         type="button"
         className="flex h-8 w-8 items-center justify-center rounded-md text-lg font-medium text-brand-800"

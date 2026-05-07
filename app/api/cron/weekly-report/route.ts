@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
   // Fetch all pro restaurants
   const { data: restaurants, error: restaurantsError } = await supabase
     .from('restaurants')
-    .select('id, name, timezone, logo_url, accent_color')
+    .select('id, name, timezone, logo_url, accent_color, metadata')
     .eq('plan', 'pro')
     .eq('is_active', true)
 
@@ -81,6 +81,13 @@ export async function GET(request: NextRequest) {
 
   for (const restaurant of restaurants) {
     try {
+      // Check if this restaurant has disabled weekly reports
+      const meta = (restaurant.metadata as Record<string, unknown>) ?? {}
+      if (meta.weekly_report_enabled === false) {
+        results.push({ restaurant: restaurant.name, status: 'skipped', reason: 'report disabled' })
+        continue
+      }
+
       // Fetch closed orders for this restaurant in the target week
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
@@ -159,7 +166,7 @@ export async function GET(request: NextRequest) {
         ordersChange = ((totalOrders - prevOrders.length) / prevOrders.length) * 100
       }
 
-      // Fetch owner email
+      // Fetch owner email as fallback
       const { data: owner } = await supabase
         .from('staff')
         .select('email')
@@ -167,8 +174,13 @@ export async function GET(request: NextRequest) {
         .eq('role', 'owner')
         .single()
 
-      if (!owner?.email) {
-        results.push({ restaurant: restaurant.name, status: 'skipped', reason: 'no owner email' })
+      // Use metadata.weekly_report_email if set, otherwise fall back to owner email
+      const reportEmail = typeof meta.weekly_report_email === 'string' && meta.weekly_report_email
+        ? meta.weekly_report_email
+        : owner?.email
+
+      if (!reportEmail) {
+        results.push({ restaurant: restaurant.name, status: 'skipped', reason: 'no recipient email' })
         continue
       }
 
@@ -193,12 +205,12 @@ export async function GET(request: NextRequest) {
 
       await resend.emails.send({
         from: 'Trapezi <reports@trapezi.app>',
-        to: owner.email,
+        to: reportEmail,
         subject: `Your weekly report — ${restaurant.name}`,
         html,
       })
 
-      console.log('[Cron] Weekly report sent to', owner.email, 'for', restaurant.name)
+      console.log('[Cron] Weekly report sent to', reportEmail, 'for', restaurant.name)
       results.push({ restaurant: restaurant.name, status: 'sent' })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

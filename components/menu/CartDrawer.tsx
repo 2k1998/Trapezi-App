@@ -29,6 +29,9 @@ type Props = {
   subtotal: number
   updateQuantity: (menu_item_id: string, qty: number) => void
   updateNotes: (menu_item_id: string, notes: string) => void
+  accent: string
+  secondary: string
+  fontPrimary: string
 }
 
 export function CartDrawer({
@@ -41,6 +44,9 @@ export function CartDrawer({
   subtotal,
   updateQuantity,
   updateNotes,
+  accent,
+  secondary,
+  fontPrimary,
 }: Props) {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
@@ -81,6 +87,9 @@ export function CartDrawer({
                 updateNotes={updateNotes}
                 goCheckout={goCheckout}
                 onClose={onClose}
+                accent={accent}
+                secondary={secondary}
+                fontPrimary={fontPrimary}
               />
             </aside>
           ) : (
@@ -102,6 +111,9 @@ export function CartDrawer({
                 updateNotes={updateNotes}
                 goCheckout={goCheckout}
                 onClose={onClose}
+                accent={accent}
+                secondary={secondary}
+                fontPrimary={fontPrimary}
               />
             </motion.aside>
           )}
@@ -119,6 +131,9 @@ function DrawerContent({
   updateNotes,
   goCheckout,
   onClose,
+  accent,
+  secondary,
+  fontPrimary,
 }: {
   items: CartItem[]
   currency: string
@@ -127,6 +142,9 @@ function DrawerContent({
   updateNotes: (id: string, notes: string) => void
   goCheckout: () => void
   onClose: () => void
+  accent: string
+  secondary: string
+  fontPrimary: string
 }) {
   const reduceMotion = useReducedMotion()
 
@@ -174,6 +192,7 @@ function DrawerContent({
                       }
                 }
                 className="mb-3 overflow-hidden rounded-lg border border-brand-100 bg-brand-50/50 p-3 last:mb-0"
+                style={{ borderColor: `${accent}33`, fontFamily: fontPrimary }}
               >
                 <div className="flex gap-3">
                   <div className="min-w-0 flex-1">
@@ -221,7 +240,7 @@ function DrawerContent({
                       </button>
                     </div>
                     <span className="text-sm font-medium text-brand-800">
-                      {formatMoney(item.price * item.quantity, currency)}
+                      <span style={{ color: accent }}>{formatMoney(item.price * item.quantity, currency)}</span>
                     </span>
                   </div>
                 </div>
@@ -234,13 +253,14 @@ function DrawerContent({
       <footer className="border-t border-brand-200 bg-white p-4">
         <div className="mb-4 flex justify-between text-brand-900">
           <span>Subtotal</span>
-          <span className="font-medium tabular-nums">{subtotalLabel}</span>
+          <span className="font-medium tabular-nums" style={{ color: secondary }}>{subtotalLabel}</span>
         </div>
         <button
           type="button"
           disabled={items.length === 0}
           onClick={goCheckout}
-          className="w-full rounded-xl bg-brand-800 py-4 text-base font-medium text-white disabled:opacity-50"
+          className="w-full rounded-xl py-4 text-base font-medium text-white disabled:opacity-50"
+          style={{ backgroundColor: accent, fontFamily: fontPrimary }}
         >
           {items.length === 0 ? 'Add items to order' : 'Place Order'}
         </button>

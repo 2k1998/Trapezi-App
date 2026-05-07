@@ -6,7 +6,8 @@
       "Bash(find . -not -path ./.next/* -not -path ./.agents/* -not -path ./node_modules/* -print)",
       "Bash(grep -v '^$')",
       "Bash(npm install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(node -e \"const d = require\\('deepl-node'\\); const t = new d.Translator\\('x'\\); console.log\\(Object.keys\\(d\\)\\)\")"
     ]
   }
 }

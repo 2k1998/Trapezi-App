@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { stripe, calculatePlatformFee } from '@/lib/stripe/server'
+import { getActiveMenuItems } from '@/lib/menu/active-menu'
+import { requirePlan } from '@/lib/plans/gates'
+import type { Plan } from '@/lib/plans/gates'
 
 interface RequestItem {
   menu_item_id: string
@@ -63,13 +66,25 @@ export async function POST(request: NextRequest) {
     // Fetch restaurant — include timezone for order_number generation
     const { data: restaurant } = await supabase
       .from('restaurants')
-      .select('id, is_active, currency, stripe_account_id, timezone')
+      .select('id, is_active, currency, stripe_account_id, timezone, plan, subscription_status, dunning_day')
       .eq('slug', slug)
       .eq('is_active', true)
       .single()
 
     if (!restaurant) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 })
+    }
+
+    // Plan gate: ordering requires at least Basic plan
+    try {
+      requirePlan(
+        (restaurant.plan ?? 'free') as Plan,
+        (restaurant.subscription_status ?? 'active') as string,
+        (restaurant.dunning_day ?? 0) as number,
+        'basic'
+      )
+    } catch {
+      return NextResponse.json({ error: 'plan_required', required: 'basic' }, { status: 403 })
     }
 
     // Stripe Connect: restaurant must have a connected account to accept payments.
@@ -124,10 +139,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Load active menu items to pick up any current happy hour discounts.
+    // Discounted prices are authoritative — they cannot be bypassed by replaying old prices.
+    let discountedPriceMap: Record<string, number | null> = {}
+    try {
+      const activeItems = await getActiveMenuItems(restaurant.id, restaurant.plan as string)
+      discountedPriceMap = Object.fromEntries(
+        activeItems.map(ai => [ai.id, ai.discounted_price])
+      )
+    } catch (err) {
+      // Non-fatal — fall back to base prices if active menu lookup fails
+      console.error('[create-payment-intent] Failed to load active menu for discount check:', err)
+    }
+
     // Server-side price calculation — never use client-submitted prices
     let subtotal = 0
     for (const item of items) {
-      subtotal += menuItemMap[item.menu_item_id].price * item.quantity
+      const base = menuItemMap[item.menu_item_id].price
+      const discounted = discountedPriceMap[item.menu_item_id]
+      const unitPrice = discounted !== null && discounted !== undefined ? discounted : base
+      subtotal += unitPrice * item.quantity
     }
     const total = subtotal // prices are VAT-inclusive; tax column is accounting-only
     const totalInCents = Math.round(total * 100)
@@ -186,6 +217,8 @@ export async function POST(request: NextRequest) {
     const orderItemsToInsert = items.map(item => {
       const dbItem = menuItemMap[item.menu_item_id]
       const nameEn = dbItem.name['en'] ?? Object.values(dbItem.name)[0] ?? ''
+      const discounted = discountedPriceMap[item.menu_item_id]
+      const unitPrice = discounted !== null && discounted !== undefined ? discounted : dbItem.price
       return {
         order_id: orderId,
         menu_item_id: item.menu_item_id,
@@ -193,8 +226,8 @@ export async function POST(request: NextRequest) {
         name_snapshot: nameEn,
         type: dbItem.type,
         quantity: item.quantity,
-        unit_price: dbItem.price,
-        line_total: dbItem.price * item.quantity,
+        unit_price: unitPrice,
+        line_total: unitPrice * item.quantity,
         notes: item.notes ?? null,
       }
     })

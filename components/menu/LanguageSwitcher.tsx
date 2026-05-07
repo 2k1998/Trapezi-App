@@ -5,6 +5,8 @@ type Props = {
   languages: string[]
   lang: string
   onLangChange: (lang: string) => void
+  accent: string
+  headerFg: string
 }
 
 export function LanguageSwitcher({
@@ -12,6 +14,8 @@ export function LanguageSwitcher({
   languages,
   lang,
   onLangChange,
+  accent,
+  headerFg,
 }: Props) {
   if (languages.length <= 1) return null
 
@@ -31,9 +35,14 @@ export function LanguageSwitcher({
           }}
           className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             lang === code
-              ? 'bg-accent-400 text-white'
-              : 'bg-brand-100 text-brand-600 hover:bg-brand-200'
+              ? 'text-white'
+              : 'bg-brand-100 hover:bg-brand-200'
           }`}
+          style={
+            lang === code
+              ? { backgroundColor: accent, color: headerFg }
+              : { color: '#3D3C37' }
+          }
         >
           {code.toUpperCase()}
         </button>

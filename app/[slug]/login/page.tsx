@@ -40,7 +40,7 @@ export default async function LoginPage({
 
   const { data: restaurant } = await supabase
     .from('restaurants')
-    .select('id, name, plan')
+    .select('id, name, plan, metadata')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle()
@@ -60,12 +60,16 @@ export default async function LoginPage({
     )
   }
 
+  const branding = ((restaurant.metadata as Record<string, unknown> | null)?.branding ??
+    {}) as { logo_url?: string | null }
+
   return (
     <LoginForm
       slug={slug}
       restaurantId={restaurant.id}
       restaurantName={restaurant.name as string}
       restaurantPlan={restaurant.plan as string}
+      logoUrl={branding.logo_url ?? null}
     />
   )
 }

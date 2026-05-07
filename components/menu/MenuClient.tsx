@@ -16,8 +16,12 @@ export type RestaurantPublic = {
   languages: string[]
   default_language: string
   accent_color: string | null
+  secondary_color?: string | null
   logo_url: string | null
   currency: string
+  branding_font?: string | null
+  confirmation_message_el?: string | null
+  confirmation_message_en?: string | null
 }
 
 export type GroupedMenuItems = { category: string; items: MenuItemRow[] }[]
@@ -31,7 +35,13 @@ type Props = {
 
 function TableErrorQR() {
   return (
-    <div className="flex min-h-[70vh] flex-col items-center justify-center px-6">
+    <div
+      className="flex min-h-screen flex-col items-center justify-center px-6"
+      style={{
+        background:
+          'radial-gradient(ellipse at top right, #3F9EF4 0%, transparent 50%), linear-gradient(to bottom, #216AB7 0%, #0D4386 40%, #082A63 70%, #020B33 100%)',
+      }}
+    >
       <div className="w-full max-w-sm rounded-2xl border border-brand-200 bg-white p-8 text-center shadow-card">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center text-brand-600">
           <QrIcon />
@@ -160,6 +170,18 @@ export function MenuClient({
 
   const tn = tableNumber as number
   const subtotalLabel = formatMoney(subtotal, restaurant.currency)
+  const accent = restaurant.accent_color ?? '#1D6FBF'
+  const secondary = restaurant.secondary_color ?? '#6B6860'
+  const fontPrimary = restaurant.branding_font ?? 'Inter'
+  const luminance = (() => {
+    const hex = accent.replace('#', '')
+    if (hex.length !== 6) return 0.4
+    const r = parseInt(hex.slice(0, 2), 16)
+    const g = parseInt(hex.slice(2, 4), 16)
+    const b = parseInt(hex.slice(4, 6), 16)
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  })()
+  const headerFg = luminance < 0.58 ? '#ffffff' : '#0F0E0D'
 
   const scrollToCat = (index: number) => {
     document
@@ -168,8 +190,20 @@ export function MenuClient({
   }
 
   return (
-    <div className="min-h-screen pb-28">
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-brand-200 bg-brand-50/90 px-4 backdrop-blur-sm">
+    <div
+      className="min-h-screen pb-28"
+      style={{
+        ['--color-accent' as string]: accent,
+        ['--color-secondary' as string]: secondary,
+        ['--font-primary' as string]: fontPrimary,
+        backgroundColor: `${accent}0D`,
+        fontFamily: 'var(--font-primary)',
+      }}
+    >
+      <header
+        className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-brand-200 px-4 backdrop-blur-sm"
+        style={{ backgroundColor: 'var(--color-accent)', color: headerFg }}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {restaurant.logo_url ? (
             <img
@@ -178,7 +212,7 @@ export function MenuClient({
               className="h-10 w-auto max-w-[140px] object-contain"
             />
           ) : (
-            <span className="truncate font-display text-lg text-brand-900">
+            <span className="truncate text-lg font-semibold">
               {restaurant.name}
             </span>
           )}
@@ -188,11 +222,14 @@ export function MenuClient({
           languages={restaurant.languages}
           lang={lang}
           onLangChange={setLang}
+          accent={accent}
+          headerFg={headerFg}
         />
       </header>
 
       <nav
-        className="sticky top-16 z-20 border-b border-brand-100 bg-brand-50/95 backdrop-blur-sm animate-slide-right"
+        className="sticky top-16 z-20 border-b border-brand-100 backdrop-blur-sm animate-slide-right"
+        style={{ backgroundColor: `${accent}12` }}
         aria-label="Categories"
       >
         <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -203,9 +240,10 @@ export function MenuClient({
               onClick={() => scrollToCat(i)}
               className={`flex-shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 activeCat === i
-                  ? 'bg-accent-400 text-white'
+                  ? 'text-white'
                   : 'bg-brand-100 text-brand-600 hover:bg-brand-200'
               }`}
+              style={activeCat === i ? { backgroundColor: 'var(--color-accent)' } : undefined}
             >
               {g.category}
             </button>
@@ -220,7 +258,7 @@ export function MenuClient({
             id={`section-cat-${gi}`}
             className="scroll-mt-32"
           >
-            <h2 className="mb-4 mt-8 font-display text-xl text-brand-900">
+            <h2 className="mb-4 mt-8 text-xl font-semibold text-brand-900" style={{ fontFamily: 'var(--font-primary)' }}>
               {group.category}
             </h2>
             <motion.div
@@ -238,6 +276,9 @@ export function MenuClient({
                     addItem={addItem}
                     updateQuantity={updateQuantity}
                     getQuantity={getQuantity}
+                    accent={accent}
+                    secondary={secondary}
+                    fontPrimary={fontPrimary}
                   />
                 </motion.div>
               ))}
@@ -250,11 +291,12 @@ export function MenuClient({
         <button
           type="button"
           onClick={() => setCartOpen(true)}
-          className={`fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-2xl bg-brand-800 px-5 py-4 text-white shadow-elevated transition-opacity ${
+          className={`fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-2xl px-5 py-4 text-white shadow-elevated transition-opacity ${
             fabReady ? 'animate-scale-in opacity-100' : 'opacity-0'
           }`}
+          style={{ backgroundColor: 'var(--color-accent)' }}
         >
-          <span className="flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-accent-400 px-2 text-sm font-semibold text-brand-900">
+          <span className="flex h-7 min-w-[1.75rem] items-center justify-center rounded-full px-2 text-sm font-semibold text-brand-900" style={{ backgroundColor: 'var(--color-secondary)' }}>
             {itemCount}
           </span>
           <span className="text-sm font-medium tabular-nums">{subtotalLabel}</span>
@@ -271,6 +313,9 @@ export function MenuClient({
         subtotal={subtotal}
         updateQuantity={updateQuantity}
         updateNotes={updateNotes}
+        accent={accent}
+        secondary={secondary}
+        fontPrimary={fontPrimary}
       />
     </div>
   )

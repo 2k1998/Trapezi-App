@@ -366,9 +366,294 @@ No kitchen or bar accounts — not needed (printer-only)
 - Decisions locked: D40–D46
 
 
-### Phase 4 — not yet built
-### Phase 5 — not yet built
-### Phase 6 — not yet built
+### Phase 4 — COMPLETE (April 2026)
+What Was Built
+
+Web Push API with VAPID keys for staff (cashier + owner)
+Push fires on: new order placed, order marked ready, tab closed
+Push subscriptions stored in push_subscriptions Supabase table
+Weekly email report via Resend — every Monday 10:00 AM Athens time (Pro plan only)
+Cron job via Vercel Cron — failures logged to cron_failures table, retried once after 30 minutes
+Confirmation screen polls for order status and shows "Your order is ready 🎉" when ready
+Service worker at public/sw.js handles push display and notification click
+
+What Was Removed
+
+Twilio/SMS entirely removed — lib/sms/index.ts deleted
+Customer push notifications removed — confirmation screen polling used instead
+app/api/push/customer-subscribe/route.ts deleted
+
+Key Decisions
+
+D47: Cashier iPad must run cashier screen as PWA added to Home Screen — mandatory for push on iOS Safari
+D48: SMS/Twilio removed entirely — replaced by Web Push API for staff
+D49: Customer push removed — confirmation screen polls and shows ready status inline
+D50: Login is restaurant-specific at /[slug]/login — no generic /login route
+
+Technical Notes
+
+VAPID keys: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_SUBJECT
+Push works on Firefox and Safari PWA — Brave/Chrome has FCM issues
+subscriber_type column on push_subscriptions: 'staff' only
+Weekly email skips restaurants with zero orders
+Cron expression: 0 8 * * 1 (08:00 UTC = 10:00 Athens)
+
+Migrations Applied
+
+003_phase4_notifications.sql — push_subscriptions table, customer_locale, sms columns on orders
+004_cron_failures.sql — cron_failures table
+005_customer_push.sql — order_id, subscriber_type on push_subscriptions, confirmed_push_sent on orders
+Unique constraint added on push_subscriptions.endpoint
+RLS policies: separate INSERT/SELECT/DELETE for staff
+
+Deployment
+
+Live at: https://trapeziapp.com
+Stripe webhook: Connected accounts webhook for payment_intent.succeeded
+STRIPE_WEBHOOK_SECRET updated on Vercel with connected accounts webhook secret
+stripe_account_id set on test-restaurant in Supabase
+
+
+### Phase 5a — Menu Management (COMPLETE)
+
+### New Tables (migration 006_phase5a_menu_management.sql)
+- `categories` — per-restaurant, bilingual, drag-to-reorder
+- `menus` — each restaurant has one default menu; Pro can have multiple
+- `menu_schedules` — time windows per day of week per menu (Europe/Athens)
+- `menu_item_assignments` — junction: item ↔ menu, with per-menu `available` boolean
+- `upsell_suggestions` — up to 2 suggestions per item, Pro only
+- `happy_hour_rules` — percentage or fixed discount, time-windowed, Pro only
+- `happy_hour_item_assignments` — items assigned to a happy hour rule
+
+### Columns added to menu_items
+- `name_el`, `name_en`, `description_el`, `description_en` — bilingual content
+- `image_url` — public URL from Supabase Storage (bucket: menu-images)
+- `allergens text[]`, `dietary text[]`
+- `category_id uuid` FK → categories (nullable)
+- `deleted_at timestamptz` — soft delete, never hard delete menu items
+
+### New Files
+- `lib/menu/translate.ts` — DeepL Free API utility, server-side only
+- `lib/menu/active-menu.ts` — active menu resolution logic (plan-aware, timezone-aware)
+- `lib/types/menu.ts` — all Phase 5a TypeScript types
+- `app/api/menu/*` — full CRUD routes for items, categories, menus, schedules, upsells, happy hour
+- `app/api/menu/active/route.ts` — public endpoint, returns active menu with discounted prices
+- `app/api/menu/translate/route.ts` — server-side DeepL proxy
+- `app/[slug]/owner/layout.tsx` — authenticated owner layout with sidebar
+- `app/[slug]/owner/menu/page.tsx` — menu management UI (Items, Categories, Menus, Upsells, Happy Hour tabs)
+
+### Key Decisions
+- Soft delete only — deleted_at column, never hard delete items (preserves order history)
+- Translation via DeepL Free API (DEEPL_API_KEY env var) — fires on save, stored in DB, never on page load
+- Translation failure is non-blocking — item saves, warning shown to owner
+- Images stored as originals in Supabase Storage; customer pages request compressed via Supabase transforms (?width=400&quality=80)
+- Item availability is per-menu via menu_item_assignments.available (not global)
+- Cashier can toggle availability from cashier screen (RLS allows cashier role to UPDATE menu_item_assignments)
+- Active menu logic: Pro = schedule-aware; Basic/Free = default menu only
+- No schedule active → all items from all menus merged and deduplicated
+- Happy hour discount validated server-side in create-payment-intent — client price never trusted
+- Upsell popup: fires before payment, max 4 suggestions, deduplicated, prioritised by most expensive cart item
+- Unavailable items show greyed out on customer page — not orderable but still visible
+
+### Environment Variables Added
+- `DEEPL_API_KEY` — DeepL Free API key (Vercel + .env.local)
+
+### Supabase Storage
+- Bucket: `menu-images` (public)
+- Path pattern: [restaurant_id]/[item_id]/[timestamp].[ext]
+
+### Plan Gating
+- Free + Basic + Pro: item CRUD, categories, images, allergens, dietary, translation
+- Basic + Pro: item availability toggle
+- Pro only: multiple menus, scheduling, upsells, happy hour
+
+### Phase 5b - — Analytics & Reporting (COMPLETE)
+
+### New Migration
+- `007_phase5b_analytics.sql` — indexes on orders.created_at and
+  (restaurant_id, created_at), manager role added to staff.role
+  constraint, RLS policies updated for manager role across all tables,
+  SECURITY DEFINER function rebuilt to fix infinite recursion bug
+
+### Manager Role
+- New valid value in staff.role: 'owner' | 'cashier' | 'manager'
+- Manager has full owner dashboard access — menu management + analytics
+- All RLS policies updated to role IN ('owner', 'manager') for read
+  and write on menu + analytics tables
+- Owner layout auth guard updated to allow manager role
+
+### New API Routes
+- /api/analytics/orders — paginated filtered order history
+- /api/analytics/metrics — KPI cards (Pro only)
+- /api/analytics/best-sellers — top items + categories (Pro only)
+- /api/analytics/heatmap — peak hours grid (Pro only)
+- /api/analytics/revenue-chart — daily/hourly revenue series (Pro only)
+- /api/analytics/export — single .xlsx file with two sheets (Pro only)
+- /api/analytics/stripe-dashboard-link — Stripe Express login link (Pro only)
+- /api/analytics/report-settings — GET/PATCH weekly report preferences (Pro only)
+
+### New Files
+- lib/analytics/queries.ts — all DB query functions for analytics
+- lib/types/analytics.ts — TypeScript types for all analytics data
+- app/[slug]/owner/analytics/page.tsx — analytics UI with 4 tabs:
+  Overview, Order History, Payouts, Reports
+
+### Key Decisions
+- Basic plan: order history locked to last 7 days, enforced server-side
+- Pro plan: unlimited order history, all analytics features
+- Export: single .xlsx file with two sheets (Orders + Order Items)
+  using ExcelJS — no zip, no CSV, Greek characters render correctly
+- Stripe Payouts tab: generates fresh Stripe Express Dashboard login
+  link on every click via stripe.accounts.createLoginLink()
+  Note: only works for Express connected accounts — Standard accounts
+  (used in test mode) will show an error, expected behaviour
+- Weekly report cron updated to check
+  restaurants.metadata.weekly_report_enabled before sending
+- Weekly report recipient reads from
+  restaurants.metadata.weekly_report_email, falls back to owner email
+- Analytics timezone: Europe/Athens for all heatmap and chart grouping
+- WoW change: compares current period vs equivalent prior period,
+  null if no prior data
+
+### Dependencies Added
+- exceljs — server-side Excel file generation
+
+### Bugs Fixed
+- RLS infinite recursion re-introduced by migration 008 — fixed by
+  rebuilding current_user_is_owner_or_manager_of_restaurant() as
+  SECURITY DEFINER function following migration 003 pattern
+- parseInt on non-numeric tableNumber returning NaN passed to Supabase
+  — fixed with isNaN guard in orders route
+- Frontend download handler saving .xlsx as .zip — fixed MIME type
+  and filename extension in export button click handler
+
+  
+### ## Phase 5c — Staff, Settings & Onboarding (COMPLETE)
+
+### New Migration
+- `009_phase5c_staff_settings.sql` — added pin_hash, 
+  failed_pin_attempts, locked_until, deleted_at to staff table;
+  created sections table with RLS; added name, capacity, 
+  section_id, deleted_at to tables table
+
+### Authentication Model
+- Full login: email + password via Supabase Auth
+- Passwords auto-generated by owner dashboard, never set by staff
+- PIN lock screen activates after configurable inactivity timeout
+- Cashier: PIN lock only, NEVER auto-logged out — only manual 
+  "End Service" with PIN confirmation
+- Owner/Manager: PIN lock escalates to full logout after 5 
+  failed attempts
+- PINs stored as bcrypt hash — never plain text in DB
+
+### Staff Management
+- Owner creates staff with auto-generated password + 4-digit PIN
+- Both shown once at creation and on reset — owner hands to staff
+- Staff cannot self-manage credentials
+- Max 1 cashier, max 1 manager per restaurant; unlimited owners
+- Soft delete on staff — deleted_at column
+
+### Branding
+- Logo upload to Supabase Storage bucket: restaurant-assets
+- Logo color extraction via ColorThief + Jimp — auto-populates 
+  accent and secondary color on upload
+- Dashboard theming (Option B): sidebar header = accent color,
+  active nav item = accent color highlight, primary buttons = 
+  accent color, sidebar body stays neutral
+- Pro: font selection, secondary color, confirmation message,
+  receipt header/receipt footer
+- Branding applied to customer menu via CSS custom properties
+
+### Settings
+- Printer IPs: owner-configurable from Settings → Printers
+- Inactivity timeout: 5/10/15/20/30 min, stored in 
+  restaurants.metadata.inactivity_timeout_minutes
+- Default timeout: 15 minutes, applies to all roles
+
+### Tables & Sections
+- Tables: number, name (optional), capacity (optional), 
+  section assignment (optional)
+- Sections: Pro only, collapsible groupings on cashier screen
+- Soft delete on tables — blocked if open tab exists
+
+### Onboarding Guide
+- 5-step visual checklist in Settings → Onboarding
+- Checkbox state persisted in localStorage per device
+
+### Supabase Storage Buckets
+- menu-images (public) — menu item photos
+- restaurant-assets (public) — restaurant logos
+
+### Dependencies Added
+- lucide-react — icons
+- bcryptjs — PIN hashing
+- colorthief — logo color extraction
+- jimp — image processing for color extraction
+
+### Key Notes
+- Never run npm audit fix --force — audit warnings are false 
+  positives from internal Next.js sub-dependencies already 
+  patched in Next.js 15/16
+- Logout button in owner sidebar — calls supabase.au
+
+
+### Phase 6 — Subscriptions (completed)
+SUBSCRIPTION PLANS (update Basic price)
+PlanPriceiPadFree€0/mo❌Basic€69/mo✅ Included (pre-configured)Pro€129/mo✅ Included (pre-configured)
+
+DATABASE — new columns on restaurants
+contract_start_date     TIMESTAMPTZ
+stripe_customer_id      TEXT
+stripe_subscription_id  TEXT
+subscription_status     TEXT  -- 'active' | 'past_due' | 'cancelled'  DEFAULT 'active'
+current_period_end      TIMESTAMPTZ
+dunning_day             INTEGER  DEFAULT 0
+Migration: 010_phase6_billing.sql applied via npx supabase db push
+
+WHAT IS BUILT — Phase 6: Subscriptions & Billing
+Backend
+
+Plan gating utility lib/plans/gates.ts — planAtLeast(), effectivePlan(), requirePlan()
+Lease calculation lib/billing/lease.ts — earlyExitFee(), contractEndDate(), LEASE_MONTHLY_WITH_VAT = €21.08
+Dunning notifications lib/billing/dunning.ts — push + Resend email with Stripe portal link
+Stripe billing event handler lib/billing/webhook-handler.ts — handles invoice.payment_succeeded, invoice.payment_failed, customer.subscription.deleted, customer.subscription.updated
+Types lib/types/billing.ts — Plan, SubscriptionStatus, BillingInfo
+POST /api/admin/activate-subscription — manual onboarding, auth via CRON_SECRET
+GET /api/billing/info — returns full billing info + early exit fee calculation
+GET /api/billing/portal — generates one-time Stripe Customer Portal URL
+POST /api/cron/dunning — daily cron at 09:00 UTC, increments dunning_day, cancels on day 10
+Stripe webhook extended with dual-secret routing (billing vs. connected-account events)
+Plan gates added to: create-payment-intent (basic+), staff creation (pro), all analytics routes (pro), menu/menus POST (pro), menu schedules (pro), export (pro), weekly report (pro), Stripe login link (pro)
+One-time setup script scripts/stripe-setup.ts — creates Stripe products + prices, writes IDs to .env.local
+
+Frontend
+
+app/[slug]/owner/billing/page.tsx — Billing tab route
+components/owner/billing/BillingHub.tsx — plan card, contract card, early exit fee, actions card, free plan comparison view
+components/owner/PlanGate.tsx — <PlanGate> and <PlanGateAuto> (reads context); shows lock + upgrade card for underprivileged plans
+components/owner/PastDueBanner.tsx — sticky global banner when subscription_status = 'past_due', shows days remaining + portal button
+Owner layout extended with billing fields fed through existing OwnerRestaurantProvider
+PlanGateAuto applied to: MenusTab, UpsellsTab, HappyHourTab, AnalyticsHub (Overview/Payouts/Reports), Export button, Sections panel, Add Staff button
+
+
+LOCKED DECISIONS — Phase 6 additions
+#DecisionD51iPad included in Basic (price raised €59 → €69/mo)D52iPad pre-configured by hardware friend for all paid plansD53Upgrades/downgrades go through Kostas manually — no self-serve UID54Downgrade takes effect at end of billing periodD55iPad lease cost hardcoded at €17/mo ex-VAT (€21.08 incl. VAT)D56Dunning: 10-day window, Stripe retries day 3/6/9, lock day 10D57Dunning notifications: push + email (Resend) daily with countdownD58Feature lock on cancellation is immediateD59Contract tracking stored as columns on restaurants tableD60Cancellation goes through Kostas — no self-serve cancellation UI
+
+NEW FILES — Phase 6
+FilePurposelib/plans/gates.tsPlan gating utilitylib/billing/lease.tsLease cost + early exit fee calculationlib/billing/dunning.tsDunning push + email notificationslib/billing/webhook-handler.tsStripe billing event handlerlib/types/billing.tsBilling typesapp/api/admin/activate-subscription/route.tsManual onboarding APIapp/api/billing/info/route.tsBilling info APIapp/api/billing/portal/route.tsStripe Customer Portal linkapp/api/cron/dunning/route.tsDaily dunning cronscripts/stripe-setup.tsOne-time Stripe product/price setupapp/[slug]/owner/billing/page.tsxBilling page routecomponents/owner/billing/BillingHub.tsxBilling page UIcomponents/owner/PlanGate.tsxPlan gate + PlanGateAuto componentscomponents/owner/PastDueBanner.tsxGlobal past-due warning banner
+
+ENVIRONMENT VARIABLES — additions
+STRIPE_PRICE_BASIC=price_xxx
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_BILLING_WEBHOOK_SECRET=whsec_xxx
+
+VERCEL CRON — additions
+json{ "path": "/api/cron/dunning", "schedule": "0 9 * * *" }
+
+REMAINING MANUAL STEP (one-time)
+Stripe Dashboard → Settings → Billing → Automatic collection → set retry schedule to Day 3, Day 6, Day 9.
+
+
 ### Phase 7 — not yet built
 
 How to work with me

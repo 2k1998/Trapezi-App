@@ -1,17 +1,19 @@
 import type { Metadata } from 'next'
-import { Inter, Playfair_Display } from 'next/font/google'
+import { DM_Sans, Playfair_Display } from 'next/font/google'
 import '../styles/globals.css'
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-display',
   display: 'swap',
+  weight: ['400', '500', '600', '700'],
 })
 
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
+const dmSans = DM_Sans({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-sans',
   display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
 })
 
 export const metadata: Metadata = {
@@ -21,12 +23,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body
-        className={`${inter.variable} ${playfair.variable} bg-brand-50 font-sans text-brand-900`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={`${playfairDisplay.variable} ${dmSans.variable}`}>
+      <body className="bg-brand-50 font-sans text-brand-900">{children}</body>
     </html>
   )
 }

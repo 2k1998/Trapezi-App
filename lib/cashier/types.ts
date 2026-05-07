@@ -27,6 +27,7 @@ export type TableRow = {
   table_number: number
   label: string | null
   status: 'available' | 'occupied'
+  section_name?: string | null
 }
 
 export type SessionGroup = {
