@@ -4,6 +4,53 @@ import { createClient } from '@/lib/supabase/middleware'
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createClient(request)
 
+  // ─── ADMIN SUBDOMAIN ROUTING ──────────────────────────────────────────────
+  // dashboard.trapeziapp.com (prod) and dashboard.localhost:3000 (dev) are
+  // handled here. Requests are rewritten to /admin/* app routes.
+  const host = request.headers.get('host') ?? ''
+  const isDashboard =
+    host === 'dashboard.trapeziapp.com' ||
+    host === 'dashboard.localhost:3000'
+
+  if (isDashboard) {
+    const pathname = request.nextUrl.pathname
+
+    // Derive the canonical admin path: strip a leading /admin if already present
+    // so we don't double-prefix when someone navigates directly to /admin/...
+    const adminRelative = pathname.startsWith('/admin') ? pathname : `/admin${pathname}`
+
+    // Allow the login page through without an auth check
+    if (adminRelative === '/admin/login' || adminRelative.startsWith('/admin/login/')) {
+      return NextResponse.rewrite(new URL(adminRelative, request.url))
+    }
+
+    // All other admin routes require a valid session + admin role
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.host = host
+      return NextResponse.redirect(loginUrl)
+    }
+
+    const { data: staffRow } = await supabase
+      .from('staff')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!staffRow || staffRow.role !== 'admin') {
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.host = host
+      return NextResponse.redirect(loginUrl)
+    }
+
+    return NextResponse.rewrite(new URL(adminRelative, request.url))
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // 1. SESSION REFRESH
   // This will refresh session if expired
   const {
@@ -14,11 +61,11 @@ export async function middleware(request: NextRequest) {
 
   // Customer facing routes: /slug or /slug/...
   // Non-customer routes: /login, /admin, /api, static assets, etc.
-  
+
   const segments = path.split('/').filter(Boolean)
   const isCustomSlug = segments.length > 0 && !['admin', 'api', '_next', 'favicon.ico'].includes(segments[0])
   const slug = isCustomSlug ? segments[0] : null
-  
+
   // 4. SLUG VALIDATION (Customer-facing routes only)
   if (slug) {
     const { data: restaurant } = await supabase
@@ -36,11 +83,11 @@ export async function middleware(request: NextRequest) {
 
   // 2. ROUTE PROTECTION & 3. ROLE ENFORCEMENT
   // Paths that require auth
-  const isProtected = path.includes('/kitchen') || 
-                      path.includes('/bar') || 
-                      path.includes('/cashier') || 
-                      path.includes('/dashboard') || 
-                      path.includes('/owner') || 
+  const isProtected = path.includes('/kitchen') ||
+                      path.includes('/bar') ||
+                      path.includes('/cashier') ||
+                      path.includes('/dashboard') ||
+                      path.includes('/owner') ||
                       path.startsWith('/admin')
 
   if (isProtected) {

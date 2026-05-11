@@ -653,8 +653,85 @@ json{ "path": "/api/cron/dunning", "schedule": "0 9 * * *" }
 REMAINING MANUAL STEP (one-time)
 Stripe Dashboard → Settings → Billing → Automatic collection → set retry schedule to Day 3, Day 6, Day 9.
 
+BUGS FIXED POST-PHASE 6
+- app/[slug]/owner/settings/page.tsx — setLayoutBranding called with 
+  callback pattern but typed as direct value setter. Fixed all occurrences 
+  to use layoutBranding directly instead of prev arrow functions.
+And add a new section for the rebrand:
+PLATFORM REBRAND (post-Phase 6)
+- Tailwind color palette: brand scale (navy #072E5A → ice white #F0F6FC), 
+  accent scale (Greek flag blue #1D6FBF)
+- Fonts: Playfair Display (font-display, headings) + DM Sans (font-sans, body)
+- Logo: public/logo.png — white Trapezi wordmark, transparent background
+- Gradient background on app/page.tsx, app/[slug]/page.tsx, 
+  app/[slug]/login: radial glow #3F9EF4 top-right + linear 
+  #216AB7 → #0D4386 → #082A63 → #020B33
+- Login card logo color: CSS filter targeting #0D4386
 
-### Phase 7 — not yet built
+
+
+
+### Phase 7a Admin Shell, Auth & Restaurant List (Completed)
+ WHAT IS BUILT — Phase 7a: Admin Shell, Auth & Restaurant List
+Backend
+
+Service role Supabase client lib/supabase/admin.ts — bypasses RLS, server-only
+Admin TypeScript types lib/types/admin.ts
+Admin auth guard lib/admin/auth.ts — requireAdmin() used in all admin API routes
+One-time admin account creation script scripts/create-admin.ts
+GET /api/admin/restaurants — all restaurants with computed counts (staff, menu items, tables, orders 30d, revenue 30d)
+POST /api/admin/restaurants — creates restaurant + owner Supabase Auth account + activates Stripe subscription
+GET /api/admin/restaurants/[restaurantId] — full restaurant detail (all related data in parallel)
+Middleware extended: detects dashboard.trapeziapp.com subdomain, rewrites to /admin/* routes, guards all non-login routes with admin role check
+
+Frontend
+
+app/admin/login/page.tsx — admin login, gradient background, role check, Greek copy
+app/admin/layout.tsx — neutral wrapper (login stays public)
+app/admin/restaurants/layout.tsx — server auth guard + <AdminShell> wrapper
+app/admin/restaurants/page.tsx — restaurant list server component
+app/admin/restaurants/[restaurantId]/page.tsx — restaurant detail server component
+app/admin/page.tsx — redirects /admin → /restaurants
+components/admin/AdminShell.tsx — navy sidebar, logo, nav (Analytics + Settings disabled), logout
+components/admin/RestaurantList.tsx — searchable/filterable table, plan/status badges, skeleton loading
+components/admin/NewRestaurantForm.tsx — slide-over panel, repeatable printer IPs, success modal with one-time password + copy button
+components/admin/RestaurantDetail.tsx — 6 tabs: Επισκόπηση, Προσωπικό, Μενού, Τραπέζια, Παραγγελίες, Branding. Read-only. Edit button disabled (Phase 7c).
+
+
+ADMIN PANEL
+
+URL: dashboard.trapeziapp.com
+Login: dashboard.trapeziapp.com/login
+Admin account: kabaniskostasIT@gmail.com
+Access: Only role = 'admin' staff with restaurant_id = null
+Internal routes: app/admin/* — rewritten by middleware from subdomain
+
+
+KEY ARCHITECTURAL DECISIONS — Phase 7a
+DecisionValueAuth guard locationapp/admin/restaurants/layout.tsx — NOT app/admin/layout.tsx (avoids login redirect loop)DB accesslib/supabase/admin.ts service role client — bypasses RLSSubdomain routingMiddleware rewrites dashboard.trapeziapp.com/* → /admin/* internallyAdmin desktop-onlyNo mobile responsiveness needed for admin panel
+
+SCHEMA NOTES (discovered Phase 7a)
+
+staff.display_name — column is display_name, NOT name
+sections.display_order — column is display_order, NOT position
+
+
+NEW FILES — Phase 7a
+FilePurposelib/supabase/admin.tsService role Supabase clientlib/types/admin.tsAdmin TypeScript typeslib/admin/auth.tsrequireAdmin() guardscripts/create-admin.tsOne-time admin account creationapp/api/admin/restaurants/route.tsGET all + POST new restaurantapp/api/admin/restaurants/[restaurantId]/route.tsGET full restaurant detailapp/admin/login/page.tsxAdmin login pageapp/admin/layout.tsxNeutral admin layout wrapperapp/admin/restaurants/layout.tsxAuth guard + AdminShell wrapperapp/admin/restaurants/page.tsxRestaurant list pageapp/admin/restaurants/[restaurantId]/page.tsxRestaurant detail pageapp/admin/page.tsxRedirect /admin → /restaurantscomponents/admin/AdminShell.tsxAdmin sidebar + layoutcomponents/admin/RestaurantList.tsxRestaurant list tablecomponents/admin/NewRestaurantForm.tsxNew restaurant slide-over + success modalcomponents/admin/RestaurantDetail.tsxRestaurant detail 6-tab view
+
+MODIFIED FILES — Phase 7a
+FileChangemiddleware.tsAdded subdomain block for dashboard.trapeziapp.com at the top — existing slug routing untouched
+
+DNS
+
+dashboard.trapeziapp.com CNAME added in Papaki.com pointing to 06f5826c823a1dbf.vercel-dns-017.com
+Domain added in Vercel → trapezi-app project → Domains
+
+
+### Phase 7b - not yet started
+### Phase 7c - not yet started
+### Phase 7d - not yet started
+
 
 How to work with me
 When I ask you to build something:
